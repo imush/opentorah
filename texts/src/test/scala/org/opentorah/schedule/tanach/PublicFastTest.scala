@@ -2,6 +2,7 @@ package org.opentorah.schedule.tanach
 
 import org.opentorah.calendar.jewish.{Jewish, NewYear}
 import org.opentorah.calendar.jewish.SpecialDay.*
+import org.opentorah.texts.tanach.Custom
 import Jewish.{Day, Year}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -47,6 +48,41 @@ final class PublicFastTest extends AnyFlatSpec, Matchers:
         withClue(s"$number ${fast.getClass.getSimpleName}: ")(
           Schedule.get(day, inHolyLand = false).morning.get
             .torah.customs.values.map(_.length).toSet shouldBe Set(3))
+
+  "the minor fasts" should "read Vayechal in the morning, without a haftarah" in:
+    var checked = 0
+    for
+      number <- 5700 to 5900
+      fast <- Seq(FastOfGedalia, FastOfTeves, FastOfEster, FastOfTammuz)
+    do
+      val day = fast.date(Year(number))
+      if !day.isShabbos then
+        val morning = Schedule.get(day, inHolyLand = false).morning.get
+        withClue(s"$number ${fast.getClass.getSimpleName}: ") {
+          // Exodus 32:11-14 and 34:1-10 -- the same Torah that is read at
+          // Mincha. Matched on the verses: toString renders the book in Hebrew.
+          morning.torah.doFind(Custom.Ashkenaz).toString should include("32:11-14")
+          // the haftarah at a minor fast belongs to Mincha, not to the morning
+          morning.haftarah.doFind(Custom.Ashkenaz) shouldBe None
+        }
+        checked += 1
+    checked should be > 0
+
+  "Tisha BeAv" should "have its own morning reading, with a haftarah" in:
+    var checked = 0
+    for number <- 5700 to 5900 do
+      val day = TishaBeAv.date(Year(number))
+      if !day.isShabbos then
+        val morning = Schedule.get(day, inHolyLand = false).morning.get
+        withClue(s"$number: ") {
+          // Deuteronomy 4:25-40, not Vayechal
+          morning.torah.doFind(Custom.Ashkenaz).toString should include("4:25-29")
+          // and unlike the minor fasts, the morning has a haftarah
+          morning.haftarah.doFind(Custom.Ashkenaz)
+            .map(_.toString).getOrElse("") should include("8:13-9:23")
+        }
+        checked += 1
+    checked should be > 0
 
   "a whole year" should "be buildable" in:
     // What #149 asks for: retrieve every day's schedule for a year. Before the
